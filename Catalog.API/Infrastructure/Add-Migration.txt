@@ -1,0 +1,2 @@
+﻿Add-Migration Init -OutputDir Infrastructure/CatalogMigrations
+Update-Database

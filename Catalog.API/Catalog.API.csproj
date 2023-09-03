@@ -23,4 +23,8 @@
     <Folder Include="Infrastructure\CatalogMigrations\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\EventBus\EventBus.csproj" />
+  </ItemGroup>
+
 </Project>
