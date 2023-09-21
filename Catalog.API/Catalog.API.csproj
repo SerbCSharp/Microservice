@@ -20,11 +20,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Infrastructure\CatalogMigrations\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\EventBus\EventBus.csproj" />
+    <Folder Include="Infrastructure\Migrations\" />
+    <Folder Include="RabbitMQ\" />
   </ItemGroup>
 
 </Project>
