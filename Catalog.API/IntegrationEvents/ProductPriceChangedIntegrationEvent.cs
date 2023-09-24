@@ -1,6 +1,8 @@
-﻿namespace Catalog.API.IntegrationEvents
+﻿using Catalog.API.EventBus;
+
+namespace Catalog.API.IntegrationEvents
 {
-    public class ProductPriceChangedIntegrationEvent
+    public class ProductPriceChangedIntegrationEvent : IntegrationEvent
     {
         public int ProductId { get; private set; }
 
