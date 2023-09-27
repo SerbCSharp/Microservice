@@ -1,7 +1,6 @@
 using Catalog.API.EventBus;
 using Catalog.API.Infrastructure;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,7 +9,11 @@ builder.Services.AddDbContext<CatalogContext>(options => options.UseSqlServer(bu
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton<IEventBus, RabbitMQBus>();
-builder.Configuration.GetSection(RabbitMqConfiguration.Section);
+
+var rabbitMqConfiguration = builder.Configuration.GetSection(RabbitMqConfiguration.Section);
+builder.Services.Configure<RabbitMqConfiguration>(rabbitMqConfiguration);
+
+builder.Services.AddHostedService<ConsumerHostedService>();
 
 var app = builder.Build();
 

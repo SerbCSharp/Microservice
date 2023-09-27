@@ -19,28 +19,34 @@ namespace Catalog.API.EventBus
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        public void Receive()
+        public async Task<T> Receive<T>() where T : IntegrationEvent
         {
-            var factory = new ConnectionFactory() { HostName = _rabbitMqConfiguration.Host };
-            using (var connection = factory.CreateConnection())
-            using (var channel = connection.CreateModel())
+            var eventName = typeof(T).Name;
+            T? integrationEvent = null;
+
+            if (ConnectionExists())
             {
-                var consumer = new EventingBasicConsumer(channel);
-
-                consumer.Received += (sender, e) =>
+                using (var channel = _connection.CreateModel())
                 {
-
-                    var body = e.Body;
-                    var message = Encoding.UTF8.GetString(body.ToArray());
-                    var json = JsonConvert.DeserializeObject<ConversationMessage>(message);
-                    SystemMessageModel systemMessage = JsonConvert.DeserializeObject<SystemMessageModel>(json.Message);
-                    Console.WriteLine($"{systemMessage.UI.Message.value}");
-                };
-                channel.BasicConsume(queue: "Abdt.Babbai.RabbitContracts.Messages.Aimee.ConversationMessage, Abdt.Babbai.RabbitContracts_Abdt.Aimee",
-                                    autoAck: true,
-                                    consumer: consumer);
-                Console.ReadLine();
+                    channel.ExchangeDeclare(exchange: BROKER_NAME, type: "direct");
+                    channel.QueueDeclare(_rabbitMqConfiguration.SubscriptionClientName);
+                    channel.QueueBind(queue: _rabbitMqConfiguration.SubscriptionClientName,
+                                      exchange: BROKER_NAME,
+                                      routingKey: eventName);
+                    var consumer = new EventingBasicConsumer(channel);
+                    consumer.Received += (sender, ea) =>
+                    {
+                        var body = ea.Body.ToArray();
+                        var message = Encoding.UTF8.GetString(body);
+                        integrationEvent = JsonConvert.DeserializeObject<T>(message);
+                    };
+                    channel.BasicConsume(queue: _rabbitMqConfiguration.SubscriptionClientName,
+                                        autoAck: false,
+                                        consumer: consumer);
+                    await Task.CompletedTask;
+                }
             }
+            return integrationEvent;
         }
 
         public void Send(IntegrationEvent @event)
@@ -51,12 +57,16 @@ namespace Catalog.API.EventBus
                 using (var channel = _connection.CreateModel())
                 {
                     channel.ExchangeDeclare(exchange: BROKER_NAME, type: "direct");
+                    channel.QueueDeclare(_rabbitMqConfiguration.SubscriptionClientName);
+                    channel.QueueBind(queue: _rabbitMqConfiguration.SubscriptionClientName,
+                                      exchange: BROKER_NAME,
+                                      routingKey: eventName);
                     var message = JsonConvert.SerializeObject(@event);
                     var body = Encoding.UTF8.GetBytes(message);
 
                     var properties = channel.CreateBasicProperties();
                     properties.DeliveryMode = 2; // persistent
-                    properties.Type = "Abdt.Babbai.RabbitContracts.Messages.Aimee.ConversationMessage, Abdt.Babbai.RabbitContracts";
+                    //properties.Type = "Abdt.Babbai.RabbitContracts.Messages.Aimee.ConversationMessage, Abdt.Babbai.RabbitContracts";
 
                     channel.BasicPublish(exchange: BROKER_NAME,
                                             routingKey: eventName,
