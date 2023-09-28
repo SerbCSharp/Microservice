@@ -3,6 +3,6 @@
     public interface IEventBus
     {
         void Send(IntegrationEvent @event);
-        Task<T> Receive<T>() where T : IntegrationEvent;
+        string Receive<T>() where T : IntegrationEvent;
     }
 }

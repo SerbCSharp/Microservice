@@ -1,4 +1,5 @@
 ﻿using Catalog.API.IntegrationEvents;
+using Newtonsoft.Json;
 
 namespace Catalog.API.EventBus
 {
@@ -15,15 +16,17 @@ namespace Catalog.API.EventBus
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+
             while (!stoppingToken.IsCancellationRequested)
             {
-                _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
-                var productPriceChanged = await _eventBus.Receive<ProductPriceChangedIntegrationEvent>();
-                _logger.LogInformation("ProductPriceChangedIntegrationEvent: {productPriceChanged}", productPriceChanged);
-                if (productPriceChanged != null)
+                var message = _eventBus.Receive<ProductPriceChangedIntegrationEvent>();
+                if (!string.IsNullOrEmpty(message))
                 {
+                    var productPriceChanged = JsonConvert.DeserializeObject<ProductPriceChangedIntegrationEvent>(message);
+                    _logger.LogInformation("NewPrice: {newPrice}", productPriceChanged?.NewPrice);
                 }
-                await Task.Delay(5000);
+
+                await Task.Delay(5000, stoppingToken);
             }
         }
     }

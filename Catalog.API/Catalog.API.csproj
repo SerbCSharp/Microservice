@@ -22,6 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="EventBus\RabbitMQ\" />
     <Folder Include="Infrastructure\Migrations\" />
   </ItemGroup>
 

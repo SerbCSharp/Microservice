@@ -3,6 +3,7 @@ using Catalog.API.Infrastructure;
 using Catalog.API.IntegrationEvents;
 using Catalog.API.Model;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Catalog.API.Controllers
 {
@@ -23,8 +24,21 @@ namespace Catalog.API.Controllers
         [HttpPost]
         public async Task<ActionResult> CreateProductAsync([FromBody] CatalogItem product)
         {
-            var priceChangedEvent = new ProductPriceChangedIntegrationEvent(product.Id, product.Price, 21);
-            _eventBus.Send(priceChangedEvent);
+            var item = new CatalogItem
+            {
+                CatalogBrandId = product.CatalogBrandId,
+                CatalogTypeId = product.CatalogTypeId,
+                Description = product.Description,
+                Name = product.Name,
+                PictureFileName = product.PictureFileName,
+                Price = product.Price,
+                CatalogType = product.CatalogType,
+                CatalogBrand = product.CatalogBrand
+            };
+
+            _catalogContext.CatalogItems.Add(item);
+            await _catalogContext.SaveChangesAsync();
+
             return NoContent();
         }
 
@@ -32,8 +46,24 @@ namespace Catalog.API.Controllers
         [HttpPut]
         public async Task<ActionResult> UpdateProductAsync([FromBody] CatalogItem product)
         {
-            var priceChangedEvent = new ProductPriceChangedIntegrationEvent(product.Id, product.Price, 21);
-            _eventBus.Send(priceChangedEvent);
+            var catalogItem = await _catalogContext.CatalogItems.SingleOrDefaultAsync(i => i.Id == product.Id);
+
+            if (catalogItem == null)
+            {
+                return NotFound(new { Message = $"Item with id {product.Id} not found." });
+            }
+            var oldPrice = catalogItem.Price;
+            var raiseProductPriceChangedEvent = oldPrice != product.Price;
+
+            catalogItem = product;
+            _catalogContext.CatalogItems.Update(catalogItem);
+            await _catalogContext.SaveChangesAsync();
+
+            if (raiseProductPriceChangedEvent)
+            {
+                var priceChangedEvent = new ProductPriceChangedIntegrationEvent(catalogItem.Id, product.Price, oldPrice);
+                _eventBus.Send(priceChangedEvent);
+            }
             return NoContent();
         }
     }

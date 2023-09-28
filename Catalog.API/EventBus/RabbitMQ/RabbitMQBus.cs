@@ -4,7 +4,7 @@ using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
 
-namespace Catalog.API.EventBus
+namespace Catalog.API.EventBus.RabbitMQ
 {
     public class RabbitMQBus : IEventBus
     {
@@ -12,41 +12,41 @@ namespace Catalog.API.EventBus
         private readonly RabbitMqConfiguration _rabbitMqConfiguration;
         private readonly ILogger<RabbitMQBus> _logger;
         private IConnection _connection;
+        private readonly string _queueName;
 
         public RabbitMQBus(IOptions<RabbitMqConfiguration> rabbitMqConfiguration, ILogger<RabbitMQBus> logger)
         {
             _rabbitMqConfiguration = rabbitMqConfiguration.Value ?? throw new ArgumentNullException(nameof(rabbitMqConfiguration));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _queueName = _rabbitMqConfiguration.SubscriptionClientName;
         }
 
-        public async Task<T> Receive<T>() where T : IntegrationEvent
+        public string Receive<T>() where T : IntegrationEvent
         {
             var eventName = typeof(T).Name;
-            T? integrationEvent = null;
+            string message = string.Empty;
 
             if (ConnectionExists())
             {
                 using (var channel = _connection.CreateModel())
                 {
-                    channel.ExchangeDeclare(exchange: BROKER_NAME, type: "direct");
-                    channel.QueueDeclare(_rabbitMqConfiguration.SubscriptionClientName);
-                    channel.QueueBind(queue: _rabbitMqConfiguration.SubscriptionClientName,
+                    channel.ExchangeDeclare(exchange: BROKER_NAME, type: ExchangeType.Direct);
+                    channel.QueueDeclare(queue: _queueName, autoDelete: false);
+                    channel.QueueBind(queue: _queueName,
                                       exchange: BROKER_NAME,
                                       routingKey: eventName);
                     var consumer = new EventingBasicConsumer(channel);
                     consumer.Received += (sender, ea) =>
                     {
                         var body = ea.Body.ToArray();
-                        var message = Encoding.UTF8.GetString(body);
-                        integrationEvent = JsonConvert.DeserializeObject<T>(message);
+                        message = Encoding.UTF8.GetString(body);
                     };
-                    channel.BasicConsume(queue: _rabbitMqConfiguration.SubscriptionClientName,
-                                        autoAck: false,
+                    channel.BasicConsume(queue: _queueName,
+                                        autoAck: true,
                                         consumer: consumer);
-                    await Task.CompletedTask;
                 }
             }
-            return integrationEvent;
+            return message;
         }
 
         public void Send(IntegrationEvent @event)
@@ -56,21 +56,12 @@ namespace Catalog.API.EventBus
             {
                 using (var channel = _connection.CreateModel())
                 {
-                    channel.ExchangeDeclare(exchange: BROKER_NAME, type: "direct");
-                    channel.QueueDeclare(_rabbitMqConfiguration.SubscriptionClientName);
-                    channel.QueueBind(queue: _rabbitMqConfiguration.SubscriptionClientName,
-                                      exchange: BROKER_NAME,
-                                      routingKey: eventName);
+                    channel.ExchangeDeclare(exchange: BROKER_NAME, type: ExchangeType.Direct);
                     var message = JsonConvert.SerializeObject(@event);
-                    var body = Encoding.UTF8.GetBytes(message);
-
-                    var properties = channel.CreateBasicProperties();
-                    properties.DeliveryMode = 2; // persistent
-                    //properties.Type = "Abdt.Babbai.RabbitContracts.Messages.Aimee.ConversationMessage, Abdt.Babbai.RabbitContracts";
-
+                    var body = Encoding.UTF8.GetBytes(message);                 
                     channel.BasicPublish(exchange: BROKER_NAME,
                                             routingKey: eventName,
-                                            basicProperties: properties,
+                                            basicProperties: null,
                                             body: body);
                 }
             }

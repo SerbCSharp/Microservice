@@ -1,4 +1,4 @@
-﻿namespace Catalog.API.EventBus
+﻿namespace Catalog.API.EventBus.RabbitMQ
 {
     public class RabbitMqConfiguration
     {
